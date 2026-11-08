@@ -561,16 +561,26 @@ final class PTPKamera {
         throw PTPFehler.antwort(c, "Auslösen")
     }
 
-    /// Startet das Live-Bild. Klappt der direkte Weg nicht, wird die Kamera zuerst in den Fernsteuer-Modus geschaltet.
+    private func liveBildKommt(_ versuche: Int = 15) async -> Bool {
+        for _ in 0..<versuche {
+            if let r = try? await befehl(0x9203), r.0 == PTP.ok, r.1.range(of: Data([0xFF, 0xD8, 0xFF])) != nil { return true }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return false
+    }
+
+    /// Startet das Live-Bild. Massgebend ist, ob danach wirklich Bilder kommen.
     func liveStarten() async throws {
-        var (c, _) = try await befehl(0x9201)            // Nikon StartLiveView
-        if c != PTP.ok && ops.contains(0x90C2) {
+        if await liveBildKommt(2) { return }                      // laeuft schon
+        var (c, _) = try await befehl(0x9201)                     // Nikon StartLiveView
+        if c != PTP.ok && c != PTP.beschaeftigt && ops.contains(0x90C2) {
             let (c2, _) = try await befehl(0x90C2, [1])
             if c2 == PTP.ok { _ = try? await warteBereit(maxSekunden: 5) }
             (c, _) = try await befehl(0x9201)
         }
-        if c == PTP.ok { c = try await warteBereit(maxSekunden: 10) }
-        if c != PTP.ok { throw PTPFehler.antwort(c, String(format: "Live-Bild (Code 0x%04X)", c)) }
+        if c == PTP.ok || c == PTP.beschaeftigt { _ = try? await warteBereit(maxSekunden: 10) }
+        if await liveBildKommt() { return }
+        throw PTPFehler.antwort(c == PTP.ok ? 0xA00B : c, String(format: "Live-Bild (Code 0x%04X)", c))
     }
 
     func liveStoppen() async { _ = try? await befehl(0x9202) }   // Nikon EndLiveView
