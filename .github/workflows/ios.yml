@@ -24,7 +24,8 @@ jobs:
           xcodebuild -project D7500Remote.xcodeproj -scheme D7500Remote -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build > build.log 2>&1 \
-            || (echo "=== FEHLER ==="; grep -E "error:" build.log | sort -u | head -80; tail -20 build.log; exit 1)
+            || (echo "=== FEHLER ==="; grep -E "error:" build.log | sort -u | head -80; tail -20 build.log; \
+                grep -E "error:" build.log | sort -u | head -40 | sed 's/^/::error::/'; exit 1)
           grep -E "warning:" build.log | sort -u | head -40 || true
 
       - name: .ipa packen
@@ -46,3 +47,12 @@ jobs:
           gh release delete neueste -y --cleanup-tag || true
           gh release create neueste D7500Remote.ipa --title "D7500 Remote – neueste Version" \
             --notes "Automatisch gebaut aus ${GITHUB_SHA::7}. Installation mit SideStore oder AltStore." --latest
+
+      - name: Fehlerprotokoll veröffentlichen
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          touch build.log
+          gh release delete fehlerprotokoll -y --cleanup-tag || true
+          gh release create fehlerprotokoll build.log --title "Letztes Fehlerprotokoll" --notes "Build ${GITHUB_SHA::7} fehlgeschlagen" --prerelease
