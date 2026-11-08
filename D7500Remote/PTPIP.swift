@@ -544,10 +544,16 @@ final class PTPKamera {
         if c != PTP.ok { throw PTPFehler.antwort(c, "Auslösen") }
     }
 
+    /// Startet das Live-Bild. Klappt der direkte Weg nicht, wird die Kamera zuerst in den Fernsteuer-Modus geschaltet.
     func liveStarten() async throws {
         var (c, _) = try await befehl(0x9200)
+        if c != PTP.ok && ops.contains(0x90C2) {
+            let (c2, _) = try await befehl(0x90C2, [1])
+            if c2 == PTP.ok { _ = try? await warteBereit(maxSekunden: 5) }
+            (c, _) = try await befehl(0x9200)
+        }
         if c == PTP.ok { c = try await warteBereit(maxSekunden: 10) }
-        if c != PTP.ok { throw PTPFehler.antwort(c, "Live-Bild") }
+        if c != PTP.ok { throw PTPFehler.antwort(c, String(format: "Live-Bild (Code 0x%04X)", c)) }
     }
 
     func liveStoppen() async { _ = try? await befehl(0x9201) }
