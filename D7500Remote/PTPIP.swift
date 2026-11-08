@@ -534,31 +534,30 @@ final class PTPKamera {
         if c != PTP.ok { throw PTPFehler.antwort(c, "Scharfstellen") }
     }
 
-    private var ausloeseWeg: UInt16?
-    private var fernmodus = false
-
-    /// Löst aus. Probiert die Auslöse-Befehle der Reihe nach und merkt sich den, der klappt.
+    /// Löst aus (per Auslöser-Test an der D7500 ermittelt):
+    /// Scharfstellen separat, Auslösen ohne AF-Anweisung; ohne Live-Bild notfalls Live-Bild kurz einschalten.
     func ausloesen(mitAF: Bool) async throws {
-        let af: UInt32 = mitAF ? 0xFFFF_FFFE : 0xFFFF_FFFF
-        var wege: [(UInt16, [UInt32])] = []
-        if ops.contains(0x9207) { wege.append((0x9207, [af, 0])) }
-        if ops.contains(0x90C0) { wege.append((0x90C0, [af])) }
-        if ops.contains(0x100E) { wege.append((0x100E, [0, 0])) }
-        if wege.isEmpty { throw PTPFehler.abgelehnt("Auslösen per WLAN nicht verfügbar") }
-        if let g = ausloeseWeg { wege.sort { a, _ in a.0 == g } }
-        var c: UInt16 = 0
-        for (i, weg) in wege.enumerated() {
-            if i == 1 && ops.contains(0x90C2) && !fernmodus {
-                let (cm, _) = try await befehl(0x90C2, [1])
-                fernmodus = cm == PTP.ok
-                if fernmodus { _ = try? await warteBereit(maxSekunden: 5) }
-            }
-            (c, _) = try await befehl(weg.0, weg.1)
-            if c == PTP.ok { c = try await warteBereit(maxSekunden: 30) }
-            if c == PTP.ok { ausloeseWeg = weg.0; return }
-            if c == 0xA002 || c == PTP.beschaeftigt { break }
+        if mitAF && ops.contains(0x90C1) {
+            var (c, _) = try await befehl(0x90C1)
+            if c == PTP.ok { c = try await warteBereit() }
+            if c == 0xA002 { throw PTPFehler.abgelehnt("Nicht scharfgestellt – Motiv anvisieren oder am Objektiv auf M stellen") }
         }
-        throw PTPFehler.antwort(c, "Auslösen")
+        func einmal() async throws -> UInt16 {
+            var (c, _) = ops.contains(0x9207) ? try await befehl(0x9207, [0xFFFF_FFFF, 0]) : try await befehl(0x100E, [0, 0])
+            if c == PTP.ok { c = try await warteBereit(maxSekunden: 30) }
+            return c
+        }
+        var c = try await einmal()
+        if [0xA004, 0xA002, 0x200F].contains(c) && ops.contains(0x9201), !(await liveBildKommt(1)) {
+            let (cl, _) = try await befehl(0x9201)
+            if cl == PTP.ok {
+                _ = try? await warteBereit(maxSekunden: 10)
+                c = try await einmal()
+                _ = try? await befehl(0x9202)
+            }
+        }
+        if c == 0xA002 { throw PTPFehler.abgelehnt("Nicht scharfgestellt – Motiv anvisieren oder am Objektiv auf M stellen") }
+        if c != PTP.ok { throw PTPFehler.antwort(c, "Auslösen") }
     }
 
     private func liveBildKommt(_ versuche: Int = 15) async -> Bool {
