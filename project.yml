@@ -1,0 +1,45 @@
+name: D7500Remote
+options:
+  bundleIdPrefix: local.d7500
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  D7500Remote:
+    type: application
+    platform: iOS
+    sources:
+      - D7500Remote
+    info:
+      path: D7500Remote/Info.plist
+      properties:
+        CFBundleDisplayName: D7500 Remote
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIBackgroundModes:
+          - location
+        NSLocalNetworkUsageDescription: "D7500 Remote verbindet sich über das WLAN der Kamera mit deiner Nikon D7500."
+        NSPhotoLibraryAddUsageDescription: "Damit die Fotos von der Kamera in deiner Fotos-App landen."
+        NSLocationWhenInUseUsageDescription: "Damit deine Fotos ihren Aufnahmeort bekommen – wie bei SnapBridge."
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Damit die Route auch aufgezeichnet wird, während das iPhone in der Tasche ist."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.d7500.remote
+        PRODUCT_NAME: D7500Remote
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+        ENABLE_BITCODE: NO

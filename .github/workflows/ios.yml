@@ -1,0 +1,48 @@
+name: iPhone-App bauen
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bauen:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: XcodeGen installieren
+        run: brew install xcodegen
+
+      - name: Xcode-Projekt erzeugen
+        run: xcodegen generate
+
+      - name: App übersetzen (ohne Signatur – SideStore signiert beim Installieren)
+        run: |
+          xcodebuild -project D7500Remote.xcodeproj -scheme D7500Remote -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build > build.log 2>&1 \
+            || (echo "=== FEHLER ==="; grep -E "error:" build.log | sort -u | head -80; tail -20 build.log; exit 1)
+          grep -E "warning:" build.log | sort -u | head -40 || true
+
+      - name: .ipa packen
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/D7500Remote.app Payload/
+          zip -qry D7500Remote.ipa Payload
+          ls -la D7500Remote.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: D7500Remote-ipa
+          path: D7500Remote.ipa
+
+      - name: Als Download veröffentlichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete neueste -y --cleanup-tag || true
+          gh release create neueste D7500Remote.ipa --title "D7500 Remote – neueste Version" \
+            --notes "Automatisch gebaut aus ${GITHUB_SHA::7}. Installation mit SideStore oder AltStore." --latest
