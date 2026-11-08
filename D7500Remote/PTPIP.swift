@@ -543,12 +543,18 @@ final class PTPKamera {
             if c == 0xA002 { throw PTPFehler.abgelehnt("Nicht scharfgestellt – Motiv anvisieren oder am Objektiv auf M stellen") }
         }
         func einmal() async throws -> UInt16 {
-            var (c, _) = ops.contains(0x9207) ? try await befehl(0x9207, [0xFFFF_FFFF, 0]) : try await befehl(0x100E, [0, 0])
+            var c: UInt16
+            if ops.contains(0x9207) {
+                (c, _) = try await befehl(0x9207, [0xFFFF_FFFF, 0])
+            } else {
+                (c, _) = try await befehl(0x100E, [0, 0])
+            }
             if c == PTP.ok { c = try await warteBereit(maxSekunden: 30) }
             return c
         }
         var c = try await einmal()
-        if [0xA004, 0xA002, 0x200F].contains(c) && ops.contains(0x9201), !(await liveBildKommt(1)) {
+        let liveLaeuft = await liveBildKommt(1)
+        if [0xA004, 0xA002, 0x200F].contains(c) && ops.contains(0x9201) && !liveLaeuft {
             let (cl, _) = try await befehl(0x9201)
             if cl == PTP.ok {
                 _ = try? await warteBereit(maxSekunden: 10)
